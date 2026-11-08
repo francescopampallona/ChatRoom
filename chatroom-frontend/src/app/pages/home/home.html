@@ -1,0 +1,121 @@
+<div class="home-container">
+  <div class="home-card">
+
+    <h1>Benvenuto {{ username }}</h1>
+
+    <p class="subtitle">
+      Gestisci le tue chat room
+    </p>
+
+    <button class="create-room-button" (click)="goToCreateRoom()">
+      + Crea una room
+    </button>
+    
+    <button class="invites-button" (click)="goToInvites()">
+     📩 I miei inviti
+    </button>
+
+    <p class="error-message" *ngIf="errorMessage">
+      {{ errorMessage }}
+    </p>
+
+    <p *ngIf="loading">
+      Caricamento room...
+    </p>
+
+    <section class="rooms-section">
+      <h2>Le tue room</h2>
+
+      <div class="empty-state" *ngIf="!loading && myRooms.length === 0">
+        <p>Non sei ancora membro di nessuna room.</p>
+      </div>
+
+      <div class="room-list" *ngIf="myRooms.length > 0">
+        <div class="room-card" *ngFor="let room of myRooms">
+
+          <h3>{{ room.name }}</h3>
+
+          <p>
+            {{ room.description || 'Nessuna descrizione' }}
+          </p>
+
+          <span class="room-type">
+            {{ room.type }}
+          </span>
+
+          <span class="room-owner">
+            Creata da {{ room.ownerUsername }}
+          </span>
+
+          <button
+            *ngIf="!isOwner(room)"
+            class="leave-room-button"
+            (click)="leaveRoom(room.id)"
+          >
+            Esci
+          </button>
+
+          <span
+            *ngIf="isOwner(room)"
+            class="owner-badge"
+          >
+            👑 Proprietario
+          </span>
+          <button  *ngIf="isOwner(room) && room.type=='PRIVATE'" class="invite-room-button" (click)="goToInvite(room.id)">
+            Invita utente
+          </button>
+          <button class="open-chat-button" (click)="openChat(room.id)">Apri chat</button>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="rooms-section">
+      <h2>Room pubbliche</h2>
+
+      <div class="empty-state" *ngIf="!loading && publicRooms.length === 0">
+        <p>Non ci sono room pubbliche disponibili.</p>
+      </div>
+
+      <div class="room-list" *ngIf="publicRooms.length > 0">
+        <div class="room-card" *ngFor="let room of publicRooms">
+
+          <h3>{{ room.name }}</h3>
+
+          <p>
+            {{ room.description || 'Nessuna descrizione' }}
+          </p>
+
+          <span class="room-owner">
+            Creata da {{ room.ownerUsername }}
+          </span>
+
+          <button
+            *ngIf="!isMyRoom(room.id)"
+            class="join-room-button"
+            (click)="joinRoom(room.id)"
+          >
+            Entra
+          </button>
+
+          <button
+            *ngIf="isMyRoom(room.id) && !isOwner(room)"
+            class="leave-room-button"
+            (click)="leaveRoom(room.id)"
+          >
+            Esci
+          </button>
+
+          <span
+            *ngIf="isOwner(room)"
+            class="owner-badge"
+          >
+            👑 Proprietario
+          </span>
+
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>

@@ -1,0 +1,58 @@
+<div class="invites-container">
+  <div class="invites-card">
+
+    <h1>I tuoi inviti</h1>
+
+    <p class="subtitle">
+      Accetta gli inviti alle room private
+    </p>
+
+    <p *ngIf="loading">
+      Caricamento inviti...
+    </p>
+
+    <p class="success-message" *ngIf="successMessage">
+      {{ successMessage }}
+    </p>
+
+    <p class="error-message" *ngIf="errorMessage">
+      {{ errorMessage }}
+    </p>
+
+    <div class="empty-state" *ngIf="!loading && invites.length === 0">
+      <p>Non hai inviti in sospeso.</p>
+    </div>
+
+    <div class="invite-list" *ngIf="invites.length > 0">
+      <div class="invite-card" *ngFor="let invite of invites">
+
+        <h3>{{ invite.roomName }}</h3>
+
+        <p>
+          Invitato da
+          <strong>{{ invite.invitedByUsername }}</strong>
+        </p>
+
+        <span class="status-badge">
+          {{ invite.status }}
+        </span>
+
+        <button
+          class="accept-button"
+          (click)="acceptInvite(invite.id)"
+        >
+          Accetta invito
+        </button>
+        <button class="decline-button" (click)="declineInvite(invite.id)">
+            Rifiuta invito
+        </button>
+      </div>
+    </div>
+<div class="actions">
+  <button class="back-home-button" (click)="goHome()">
+    ← Torna alla Home
+  </button>
+</div>
+  </div>
+  
+</div>

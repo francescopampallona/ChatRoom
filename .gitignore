@@ -1,0 +1,104 @@
+# Regole condivise da backend e frontend, anche nelle sottocartelle.
+
+# Configurazioni locali e segreti (i template restano versionabili)
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+**/src/main/resources/application-local.properties
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-local.yaml
+
+# Java / Maven: output compilati e file generati
+target/
+build/
+*.class
+*.jar
+*.war
+*.ear
+# Il wrapper Maven deve restare disponibile per compilare da un clone pulito.
+!**/.mvn/wrapper/maven-wrapper.jar
+**/.mvn/timing.properties
+**/.mvn/wrapper/maven-wrapper.properties.backup
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+/chatroom/HELP.md
+
+# Angular / Node: dipendenze, build e cache
+node_modules/
+dist/
+out-tsc/
+.angular/
+.npm/
+.sass-cache/
+*.tsbuildinfo
+
+# Report dei test, log e dump della JVM
+coverage/
+.nyc_output/
+test-results/
+logs/
+*.log
+*.log.*
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# Configurazioni personali di IDE ed editor
+.idea/
+.vscode/
+.history/
+*.iml
+*.iws
+*.ipr
+*.code-workspace
+*.sublime-workspace
+.classpath
+.project
+.factorypath
+.settings/
+.apt_generated/
+.apt_generated_tests/
+.springBeans
+.sts4-cache/
+**/nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# Dati e override Docker locali; compose.yaml e Dockerfile restano versionabili
+/.docker-data/
+/mysql-data/
+/compose.override.yaml
+/compose.override.yml
+
+# File temporanei, backup e copie archiviate del progetto
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+/backups/
+/*.zip
+
+# File del sistema operativo
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

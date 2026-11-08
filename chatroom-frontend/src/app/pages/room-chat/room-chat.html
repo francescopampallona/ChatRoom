@@ -1,0 +1,103 @@
+<div class="chat-page">
+
+  <div class="chat-card">
+
+    <header class="chat-header">
+         <div>
+        <h1>{{ room?.name }}</h1>
+
+        <p>
+            {{ room?.type === 'PRIVATE'
+                ? 'Room privata'
+                : 'Room pubblica' }}
+        </p>
+    </div>
+
+      <div class="header-actions">
+        <span
+          class="connection-status"
+          [class.connected]="connected"
+        >
+          {{ connected ? '● Connesso' : '● Connessione...' }}
+        </span>
+
+        <button
+          type="button"
+          class="back-button"
+          (click)="goHome()"
+        >
+          Torna alla Home
+        </button>
+      </div>
+    </header>
+
+    <p
+      class="error-message"
+      *ngIf="errorMessage"
+    >
+      {{ errorMessage }}
+    </p>
+
+    <section class="messages" #messagesContainer>
+
+      <div
+        class="empty-state"
+        *ngIf="messages.length === 0"
+      >
+        Non ci sono ancora messaggi.
+      </div>
+
+      <article
+        class="message"
+        *ngFor="let message of messages"
+      >
+        <div class="message-header">
+
+          <strong>
+            {{ message.senderUsername }}
+          </strong>
+
+          <time>
+            {{ message.sentAt | date:'dd/MM/yyyy HH:mm' }}
+          </time>
+
+        </div>
+
+        <p>
+          {{ message.content }}
+        </p>
+
+      </article>
+
+    </section>
+
+    <form
+      class="message-form"
+      (ngSubmit)="sendMessage()"
+    >
+
+      <input
+        type="text"
+        name="newMessage"
+        [(ngModel)]="newMessage"
+        placeholder="Scrivi un messaggio..."
+        autocomplete="off"
+        [disabled]="!connected || sending"
+      >
+
+      <button
+        type="submit"
+        [disabled]="
+          !connected ||
+          sending ||
+          !newMessage.trim()
+        "
+      >
+        {{ sending ? 'Invio...' : 'Invia' }}
+      </button>
+
+    </form>
+
+  </div>
+
+</div>

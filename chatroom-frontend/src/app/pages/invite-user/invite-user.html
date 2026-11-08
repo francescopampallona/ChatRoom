@@ -1,0 +1,44 @@
+<div class="invite-container">
+  <div class="invite-card">
+
+    <h1>Invita utente</h1>
+
+    <p class="subtitle">
+      Inserisci lo username dell’utente da invitare nella room privata
+    </p>
+
+    <form (ngSubmit)="inviteUser()">
+
+      <div class="form-group">
+        <label for="username">Username</label>
+
+        <input
+          id="username"
+          type="text"
+          name="username"
+          [(ngModel)]="form.username"
+          placeholder="Es. mario"
+          required
+        >
+      </div>
+
+      <button type="submit" [disabled]="loading">
+        {{ loading ? 'Invio invito...' : 'Invita utente' }}
+      </button>
+
+    </form>
+
+    <button class="secondary-button" type="button" (click)="goBack()">
+      Torna alla home
+    </button>
+
+    <p class="success-message" *ngIf="successMessage">
+      {{ successMessage }}
+    </p>
+
+    <p class="error-message" *ngIf="errorMessage">
+      {{ errorMessage }}
+    </p>
+
+  </div>
+</div>

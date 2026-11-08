@@ -1,0 +1,66 @@
+<div class="create-room-container">
+  <div class="create-room-card">
+
+    <h1>Crea una room</h1>
+
+    <p class="subtitle">
+      Crea una nuova chat pubblica o privata
+    </p>
+
+    <form (ngSubmit)="createRoom()">
+
+      <div class="form-group">
+        <label for="name">Nome room</label>
+
+        <input
+          id="name"
+          type="text"
+          name="name"
+          [(ngModel)]="form.name"
+          placeholder="Es. Team sviluppo"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="description">Descrizione</label>
+
+        <textarea
+          id="description"
+          name="description"
+          [(ngModel)]="form.description"
+          placeholder="Descrizione opzionale della room"
+          rows="4"
+        ></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="type">Tipo room</label>
+
+        <select
+          id="type"
+          name="type"
+          [(ngModel)]="form.type"
+          required
+        >
+          <option value="PUBLIC">Pubblica</option>
+          <option value="PRIVATE">Privata</option>
+        </select>
+      </div>
+
+      <button type="submit" [disabled]="loading">
+        {{ loading ? 'Creazione...' : 'Crea room' }}
+      </button>
+
+    </form>
+
+    <p class="success-message" *ngIf="successMessage">
+      {{ successMessage }}
+    </p>
+
+    <p class="error-message" *ngIf="errorMessage">
+      {{ errorMessage }}
+    </p>
+
+  </div>
+</div>

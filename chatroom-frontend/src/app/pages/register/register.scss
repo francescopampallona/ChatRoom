@@ -1,0 +1,152 @@
+* {
+  box-sizing: border-box;
+}
+
+.register-container {
+  min-height: 100vh;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background: linear-gradient(
+    135deg,
+    #1e293b,
+    #0f172a
+  );
+
+  padding: 20px;
+}
+
+.register-card {
+
+  width: 100%;
+  max-width: 420px;
+
+  background: white;
+
+  padding: 40px;
+
+  border-radius: 16px;
+
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.2);
+
+}
+
+h1 {
+
+  margin-bottom: 10px;
+
+  text-align: center;
+
+  color: #0f172a;
+
+  font-size: 32px;
+}
+
+.subtitle {
+
+  text-align: center;
+
+  color: #64748b;
+
+  margin-bottom: 30px;
+}
+
+.form-group {
+
+  display: flex;
+  flex-direction: column;
+
+  margin-bottom: 20px;
+}
+
+label {
+
+  margin-bottom: 8px;
+
+  font-weight: 600;
+
+  color: #334155;
+}
+
+input {
+
+  padding: 14px;
+
+  border: 1px solid #cbd5e1;
+
+  border-radius: 10px;
+
+  font-size: 16px;
+
+  transition: 0.2s;
+}
+
+input:focus {
+
+  outline: none;
+
+  border-color: #3b82f6;
+
+  box-shadow:
+    0 0 0 4px rgba(59,130,246,0.15);
+}
+
+button {
+
+  width: 100%;
+
+  padding: 14px;
+
+  border: none;
+
+  border-radius: 10px;
+
+  background: #2563eb;
+
+  color: white;
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+button:hover {
+
+  background: #1d4ed8;
+}
+
+button:disabled {
+
+  opacity: 0.7;
+
+  cursor: not-allowed;
+}
+
+.success-message {
+
+  margin-top: 20px;
+
+  color: #16a34a;
+
+  text-align: center;
+
+  font-weight: 600;
+}
+
+.error-message {
+
+  margin-top: 20px;
+
+  color: #dc2626;
+
+  text-align: center;
+
+  font-weight: 600;
+}

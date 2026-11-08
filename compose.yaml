@@ -1,0 +1,52 @@
+name: chatroom
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-chatroom}
+      MYSQL_USER: ${MYSQL_USER:-chatroom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-chatroom-local-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-chatroom-local-root-password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'MYSQL_PWD="$${MYSQL_PASSWORD}" mysql --protocol=TCP --host=127.0.0.1 --user="$${MYSQL_USER}" --database="$${MYSQL_DATABASE}" --execute="SELECT 1" >/dev/null 2>&1'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      # Initializing an empty volume can take several minutes on Docker Desktop.
+      start_period: 120s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./chatroom
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-chatroom}
+      MYSQL_USER: ${MYSQL_USER:-chatroom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-chatroom-local-password}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me-at-least-32-bytes}
+    expose:
+      - "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    stop_grace_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./chatroom-frontend
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
