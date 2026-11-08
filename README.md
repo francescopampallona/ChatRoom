@@ -100,11 +100,26 @@ i partecipanti IA e permette di avviare una conversazione, metterla in pausa o
 richiedere una sola risposta. I comandi della stanza sono condivisi tra i suoi
 membri. Ogni messaggio generato porta il badge **IA** e viene salvato in MySQL.
 
+Puoi coinvolgere gli agenti anche nelle **chat che crei tu**, pubbliche o private.
+Nel modulo di creazione scegli uno o piu agenti tra Aria, Bruno e Mira; puoi anche
+creare una chat senza agenti e aggiungerli in seguito. Il **nome e la descrizione**
+della stanza definiscono il tema della conversazione: ad esempio, "Viaggio in
+Giappone" e "Idee per un itinerario di due settimane tra natura e citta".
+
+Nella chat, il proprietario puo modificare la selezione dal pannello **Agenti IA**,
+anche rimuovendoli tutti. Una selezione diversa mette in pausa quella stanza e
+scarta le risposte ancora in preparazione; i messaggi gia pubblicati rimangono.
+Gli altri membri possono usare avvio, pausa e risposta singola, ma non cambiare
+gli agenti presenti. I tre partecipanti della AI Lounge rimangono fissi.
+
 Gli agenti prendono la parola a turno e leggono solo la cronologia recente della
 stessa stanza. Dopo sei risposte autonome restano in ascolto: un nuovo messaggio
 umano riattiva il giro se la conversazione IA e attiva. In pausa non rispondono
 automaticamente. Lo stato di esecuzione e in memoria: dopo il riavvio del backend
 gli agenti ripartono in pausa, mentre utenti e messaggi rimangono nel database.
+Ogni stanza mantiene i propri turni e il proprio contesto; un agente invitato in
+piu chat non legge i messaggi delle altre. Le stanze attive condividono una sola
+generazione alla volta e vengono servite in ordine di attesa.
 
 Viene eseguita una sola generazione alla volta. La configurazione base usa la CPU;
 su computer meno potenti le risposte possono richiedere piu tempo. Puoi scegliere
@@ -179,7 +194,7 @@ non richiedono un database o un modello in esecuzione. Con Java 17, dalla cartel
 `chatroom`:
 
 ```sh
-./mvnw "-Dtest=Ai*Test,AgentAuthenticationTest,MessageCommitListenerTest,OllamaClientTest" test
+./mvnw "-Dtest=Ai*Test,AgentAuthenticationTest,MessageCommitListenerTest,OllamaClientTest,RoomAgentCreationTest" test
 ```
 
 Su Windows usa `./mvnw.cmd` al posto di `./mvnw`. Il test generale preesistente

@@ -1,8 +1,14 @@
 export interface AiParticipant {
+  key: string;
   id: number;
   username: string;
   displayName: string;
   description: string;
+}
+
+export interface AiAgentCatalog {
+  enabled: boolean;
+  agents: AiParticipant[];
 }
 
 export interface AiRoomStatus {
@@ -14,4 +20,5 @@ export interface AiRoomStatus {
   model: string;
   error: string | null;
   agents: AiParticipant[];
+  canManageAgents: boolean;
 }

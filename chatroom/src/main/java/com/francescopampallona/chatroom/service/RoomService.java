@@ -1,5 +1,6 @@
 package com.francescopampallona.chatroom.service;
 
+import com.francescopampallona.chatroom.ai.AiRoomData;
 import com.francescopampallona.chatroom.dto.request.CreateRoomRequest;
 import com.francescopampallona.chatroom.dto.response.RoomDto;
 import com.francescopampallona.chatroom.dto.response.UserDto;
@@ -24,16 +25,20 @@ public class RoomService {
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
+    private final AiRoomData aiRoomData;
 
-    public RoomService(RoomMapper roomMapper, UserRepository userRepository, RoomRepository roomRepository, RoomMemberRepository roomMemberRepository){
+    public RoomService(RoomMapper roomMapper, UserRepository userRepository, RoomRepository roomRepository, RoomMemberRepository roomMemberRepository, AiRoomData aiRoomData){
         this.roomMapper = roomMapper;
         this.userRepository = userRepository;
         this.roomRepository = roomRepository;
         this.roomMemberRepository = roomMemberRepository;
+        this.aiRoomData = aiRoomData;
     }
 
     @Transactional
     public RoomDto createRoom(CreateRoomRequest request, User owner){
+
+        aiRoomData.validateAgentKeys(request.getAgentKeys());
 
         Room room = roomMapper.toEntity(request);
         room.setOwner(owner);
@@ -47,6 +52,7 @@ public class RoomService {
                 .build();
 
         roomMemberRepository.save(roomMember);
+        aiRoomData.configureAgents(savedRoom.getId(), owner, request.getAgentKeys());
 
         return roomMapper.toDto(savedRoom);
 

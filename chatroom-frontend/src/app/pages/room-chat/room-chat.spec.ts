@@ -1,7 +1,7 @@
 import { fakeAsync, tick } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
-import { AiRoomStatus } from '../../dto/AiRoomStatus';
+import { AiParticipant, AiRoomStatus } from '../../dto/AiRoomStatus';
 import { MessageResponse } from '../../dto/MessageResponse';
 import { PageResponse } from '../../dto/PageResponse';
 import { RoomDto } from '../../dto/RoomDto';
@@ -11,9 +11,11 @@ import { MessageService } from '../../services/message';
 import { RoomService } from '../../services/room';
 import { RoomChatComponent } from './room-chat';
 
+const aria: AiParticipant = { key: 'aria', id: 11, username: 'aria.ai', displayName: 'Aria', description: 'Creativa' };
+const mira: AiParticipant = { key: 'mira', id: 13, username: 'mira.ai', displayName: 'Mira', description: 'Empatica' };
 const status = (overrides: Partial<AiRoomStatus> = {}): AiRoomStatus => ({
   enabled: true, ready: true, running: false, generating: false,
-  remainingTurns: 0, model: 'local', error: null, agents: [], ...overrides
+  remainingTurns: 0, model: 'local', error: null, agents: [aria], canManageAgents: false, ...overrides
 });
 const message = (id: number): MessageResponse => ({
   id, roomId: 7, senderId: 11, senderUsername: 'aria.ai', senderIsAgent: true,
@@ -47,7 +49,11 @@ describe('RoomChatComponent AI conversation', () => {
     rooms.getRoomById.and.callFake(() => of(room));
     history = jasmine.createSpyObj<MessageService>('MessageService', ['getMessages']);
     history.getMessages.and.returnValue(of(page([])));
-    ai = jasmine.createSpyObj<AiRoomService>('AiRoomService', ['getStatus', 'setRunning', 'requestTurn']);
+    ai = jasmine.createSpyObj<AiRoomService>('AiRoomService', ['getStatus', 'setRunning', 'requestTurn', 'getAgents', 'setAgents']);
+    ai.getAgents.and.returnValue(of({ enabled: true, agents: [aria, mira] }));
+    ai.setAgents.and.callFake((_id, keys) => of(status({
+      canManageAgents: true, agents: [aria, mira].filter(agent => keys.includes(agent.key))
+    })));
     ai.getStatus.and.returnValue(of(status()));
     ai.setRunning.and.callFake((_id, running) => of(status({ running, remainingTurns: running ? 6 : 0 })));
     ai.requestTurn.and.returnValue(of(status({ generating: true })));
@@ -63,11 +69,17 @@ describe('RoomChatComponent AI conversation', () => {
     messages.complete();
   });
 
-  it('never polls ordinary rooms', fakeAsync(() => {
+  it('detects newly invited agents in an ordinary room without reopening the chat', fakeAsync(() => {
     room.aiRoom = false;
+    ai.getStatus.and.returnValues(of(status({ agents: [] })), of(status()));
     component.ngOnInit();
-    tick(12000);
-    expect(ai.getStatus).not.toHaveBeenCalled();
+    tick(0);
+    expect(component.showAiPanel).toBeFalse();
+    expect(component.canAskAgent).toBeFalse();
+    tick(4000);
+    expect(component.showAiPanel).toBeTrue();
+    expect(component.canAskAgent).toBeTrue();
+    expect(ai.getAgents).not.toHaveBeenCalled();
     component.ngOnDestroy();
   }));
 
@@ -148,6 +160,77 @@ describe('RoomChatComponent AI conversation', () => {
     messages.next({ ...message(3), roomId: 999 });
     expect(component.messages.map(value => value.id)).toEqual([1, 2]);
     expect(component.messages[1].senderIsAgent).toBeTrue();
+    component.ngOnDestroy();
+  }));
+
+  it('preserves an owner’s draft during polling and saves the chosen agents', fakeAsync(() => {
+    room.aiRoom = false;
+    ai.getStatus.and.returnValue(of(status({ canManageAgents: true })));
+    component.ngOnInit();
+    tick(0);
+    expect(component.selectedAgentKeys).toEqual(['aria']);
+    component.selectAgents(['mira']);
+    tick(4000);
+    expect(component.selectedAgentKeys).toEqual(['mira']);
+    expect(component.agentSelectionDirty).toBeTrue();
+    component.saveAgents();
+    expect(ai.setAgents).toHaveBeenCalledWith(7, ['mira']);
+    expect(component.aiStatus?.agents).toEqual([mira]);
+    expect(component.agentSelectionDirty).toBeFalse();
+    expect(component.aiStatus?.running).toBeFalse();
+    component.ngOnDestroy();
+  }));
+
+  it('allows the owner to remove every agent even during generation and keeps invitation controls', fakeAsync(() => {
+    room.aiRoom = false;
+    ai.getStatus.and.returnValue(of(status({ canManageAgents: true, generating: true, running: true })));
+    component.ngOnInit();
+    tick(0);
+    component.selectAgents([]);
+    component.saveAgents();
+    expect(ai.setAgents).toHaveBeenCalledWith(7, []);
+    expect(component.aiStatus?.agents).toEqual([]);
+    expect(component.showAiPanel).toBeTrue();
+    expect(component.canAskAgent).toBeFalse();
+    expect(component.aiStatusLabel).toBe('Nessun agente invitato');
+    component.ngOnDestroy();
+  }));
+
+  it('does not expose membership changes to a regular member', () => {
+    component.aiStatus = status();
+    component.agentCatalog = { enabled: true, agents: [aria, mira] };
+    component.selectAgents(['mira']);
+    component.saveAgents();
+    expect(component.agentSelectionDirty).toBeFalse();
+    expect(ai.setAgents).not.toHaveBeenCalled();
+  });
+
+  it('keeps the owner’s selection after a denied change and explains the owner-only permission', () => {
+    component.roomId = 7;
+    component.aiStatus = status({ canManageAgents: true });
+    component.agentCatalog = { enabled: true, agents: [aria, mira] };
+    component.selectAgents(['mira']);
+    ai.setAgents.and.returnValue(throwError(() => ({ status: 403 })));
+    component.saveAgents();
+    expect(component.selectedAgentKeys).toEqual(['mira']);
+    expect(component.agentSelectionDirty).toBeTrue();
+    expect(component.aiActionError).toContain('proprietario');
+    expect(component.aiStatus.agents).toEqual([aria]);
+  });
+
+  it('ignores an older poll after the owner changes the agents', fakeAsync(() => {
+    const pending = new Subject<AiRoomStatus>();
+    ai.getStatus.and.returnValue(pending);
+    component.ngOnInit();
+    component.aiStatus = status({ canManageAgents: true });
+    component.agentCatalog = { enabled: true, agents: [aria, mira] };
+    tick(0);
+    component.selectAgents(['mira']);
+    component.saveAgents();
+    pending.next(status({ canManageAgents: true }));
+    pending.complete();
+    expect(component.selectedAgentKeys).toEqual(['mira']);
+    expect(component.aiStatus?.agents).toEqual([mira]);
     component.ngOnDestroy();
   }));
 

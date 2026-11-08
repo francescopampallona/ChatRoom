@@ -7,7 +7,7 @@
         <h1>{{ room?.name || 'Chat room' }}</h1>
 
         <p *ngIf="room">
-            <span class="ai-badge" *ngIf="room.aiRoom">IA Lounge</span>
+            <span class="ai-badge" *ngIf="room.aiRoom || aiStatus?.agents?.length">{{ room.aiRoom ? 'IA Lounge' : 'Agenti IA' }}</span>
             {{ room.type === 'PRIVATE'
                 ? 'Room privata'
                 : 'Room pubblica' }}
@@ -32,11 +32,12 @@
       </div>
     </header>
 
-    <section class="ai-panel" *ngIf="room?.aiRoom" aria-label="Agenti della room">
+    <section class="ai-panel" *ngIf="showAiPanel" aria-label="Agenti della room">
       <div class="ai-panel-heading">
         <div>
-          <h2>Tre voci, una conversazione</h2>
-          <p>Gli agenti IA dialogano tra loro e con te. Puoi entrare nella conversazione in qualsiasi momento.</p>
+          <h2>{{ aiPanelTitle }}</h2>
+          <p *ngIf="room?.aiRoom">Gli agenti IA dialogano tra loro e con te. Puoi entrare nella conversazione in qualsiasi momento.</p>
+          <p *ngIf="!room?.aiRoom"><strong>Tema:</strong> {{ room?.name }}{{ room?.description ? ' — ' + room?.description : '' }}</p>
         </div>
         <span class="ai-status" role="status"
           [class.active]="aiStatus?.running && aiStatus?.ready && !aiStatusError">
@@ -51,7 +52,32 @@
       </ul>
 
       <p class="ai-hint">{{ aiStatusHint }}</p>
-      <div class="ai-actions">
+
+      <ng-container *ngIf="aiStatus?.canManageAgents">
+        <div class="ai-actions" *ngIf="aiStatus?.agents?.length && !agentEditorOpen">
+          <button type="button" (click)="agentEditorOpen = true" [disabled]="aiBusy">Scegli agenti</button>
+        </div>
+        <div *ngIf="agentEditorOpen || !aiStatus?.agents?.length">
+          <p *ngIf="agentCatalogLoading" role="status">Caricamento degli agenti…</p>
+          <app-agent-picker *ngIf="agentCatalog?.enabled" legend="Agenti nella stanza"
+            [agents]="agentCatalog?.agents || []" [selectedKeys]="selectedAgentKeys"
+            [disabled]="aiBusy" (selectedKeysChange)="selectAgents($event)">
+          </app-agent-picker>
+          <p *ngIf="agentCatalog && !agentCatalog.enabled">Gli agenti IA sono disabilitati.</p>
+          <p class="ai-error" *ngIf="agentCatalogError" role="alert">{{ agentCatalogError }}</p>
+          <div class="ai-actions">
+            <button type="button" *ngIf="agentCatalogError" [disabled]="aiBusy || agentCatalogLoading"
+              (click)="loadAgentCatalog()">Riprova a caricare gli agenti</button>
+            <button type="button" class="ai-primary" *ngIf="agentCatalog?.enabled"
+              [disabled]="aiBusy || !agentSelectionDirty" (click)="saveAgents()">Salva agenti</button>
+            <button type="button" *ngIf="agentEditorOpen || agentSelectionDirty"
+              [disabled]="aiBusy" (click)="cancelAgentSelection()">Annulla</button>
+          </div>
+          <p class="ai-shared-note" *ngIf="agentCatalog?.enabled">Deseleziona un agente per farlo uscire. Dopo ogni modifica la conversazione IA torna in pausa.</p>
+        </div>
+      </ng-container>
+
+      <div class="ai-actions" *ngIf="aiStatus?.agents?.length">
         <button type="button" class="ai-primary"
           *ngIf="!aiStatus?.running || aiStatus?.remainingTurns === 0"
           [disabled]="!canAskAgent" (click)="setAiRunning(true)">
@@ -62,7 +88,7 @@
         <button type="button" [disabled]="!canAskAgent" (click)="requestAiTurn()">Una risposta IA</button>
         <span class="ai-updating" *ngIf="aiBusy" role="status">Aggiornamento…</span>
       </div>
-      <p class="ai-shared-note">I comandi valgono per tutta la room. In pausa puoi chiedere una risposta alla volta.</p>
+      <p class="ai-shared-note" *ngIf="aiStatus?.agents?.length">I comandi valgono per tutta la room. In pausa puoi chiedere una risposta alla volta.</p>
       <p class="ai-error" *ngIf="aiStatusError" role="alert">{{ aiStatusError }}</p>
       <p class="ai-error" *ngIf="aiActionError" role="alert">{{ aiActionError }}</p>
       <p class="ai-error" *ngIf="aiStatus && aiStatus.error && aiStatus.enabled && aiStatus.ready && !aiStatusError" role="status">
@@ -86,7 +112,7 @@
         class="empty-state"
         *ngIf="!loadingMessages && messages.length === 0"
       >
-        {{ room?.aiRoom ? 'Scrivi il primo messaggio o avvia una conversazione tra gli agenti.' : 'Non ci sono ancora messaggi.' }}
+        {{ aiStatus?.agents?.length ? 'Scrivi il primo messaggio o avvia la conversazione con gli agenti.' : 'Non ci sono ancora messaggi.' }}
       </div>
 
       <article

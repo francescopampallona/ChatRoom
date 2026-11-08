@@ -3,6 +3,7 @@ package com.francescopampallona.chatroom.ai;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import com.francescopampallona.chatroom.model.User;
 
 import java.util.ArrayDeque;
 import java.util.List;
@@ -33,7 +34,8 @@ class AiCoordinatorTest {
         now = new AtomicLong(1_000);
         coordinator = new AiCoordinator(properties, ollama, data, worker, now::get);
         when(ollama.readiness()).thenReturn(new OllamaClient.Readiness(true, null));
-        when(data.agents()).thenReturn(List.of());
+        when(data.agents(anyLong())).thenReturn(List.of());
+        when(data.personas(anyLong())).thenReturn(AiPersona.ALL);
         when(data.context(anyLong(), any(AiPersona.class))).thenAnswer(invocation ->
                 new AiRoomData.Context(AGENT, "Room " + invocation.getArgument(0),
                         List.of(new OllamaClient.ChatMessage("user", "Ciao"))));
@@ -353,6 +355,8 @@ class AiCoordinatorTest {
     @Test
     void disabledAiRejectsControlAndIgnoresHumanMessagesAndTicks() {
         properties.setEnabled(false);
+        var present = List.of(new AiRoomStatus.Agent("mira", AGENT, "mira.ai", "Mira", "Pratica"));
+        when(data.agents(ROOM)).thenReturn(present);
         coordinator.onHumanMessage(ROOM);
         coordinator.tick();
 
@@ -360,8 +364,11 @@ class AiCoordinatorTest {
         assertThrows(IllegalStateException.class, () -> coordinator.singleTurn(ROOM));
         assertFalse(coordinator.status(ROOM).enabled());
         assertFalse(coordinator.status(ROOM).ready());
+        assertEquals(present, coordinator.status(ROOM).agents());
         assertEquals(0, worker.size());
-        verifyNoInteractions(ollama, data);
+        verifyNoInteractions(ollama);
+        verify(data, never()).context(anyLong(), any());
+        verify(data, never()).personas(anyLong());
     }
 
     @Test
@@ -379,6 +386,99 @@ class AiCoordinatorTest {
         assertEquals(0, worker.size());
         assertFalse(coordinator.status(ROOM).running());
         assertThrows(IllegalStateException.class, () -> coordinator.singleTurn(ROOM));
+    }
+
+    @Test
+    void onlySelectedAgentsTakeTurnsAndOneAgentCanReplyAlone() {
+        when(data.personas(ROOM)).thenReturn(List.of(AiPersona.ALL.get(1), AiPersona.ALL.get(2)));
+        for (int i = 0; i < 3; i++) {
+            coordinator.singleTurn(ROOM);
+            worker.runNext();
+        }
+        when(data.personas(ROOM + 1)).thenReturn(List.of(AiPersona.ALL.get(2)));
+        coordinator.singleTurn(ROOM + 1);
+        worker.runNext();
+        coordinator.singleTurn(ROOM + 1);
+        worker.runNext();
+
+        ArgumentCaptor<AiPersona> selected = ArgumentCaptor.forClass(AiPersona.class);
+        verify(data, times(3)).context(eq(ROOM), selected.capture());
+        assertEquals(List.of("bruno", "mira", "bruno"), selected.getAllValues().stream().map(AiPersona::key).toList());
+        verify(data, times(2)).context(ROOM + 1, AiPersona.ALL.get(2));
+    }
+
+    @Test
+    void emptyRoomRejectsStartAndManualTurnWithoutConsumingTheGlobalWorker() {
+        when(data.personas(ROOM)).thenReturn(List.of());
+        assertThrows(IllegalStateException.class, () -> coordinator.setRunning(ROOM, true));
+        assertThrows(IllegalStateException.class, () -> coordinator.singleTurn(ROOM));
+        coordinator.singleTurn(ROOM + 1);
+        worker.runNext();
+        verify(data, never()).context(eq(ROOM), any());
+        verify(data).saveReply(ROOM + 1, AGENT, "Risposta AI");
+    }
+
+    @Test
+    void membershipChangeDuringInferencePausesOnlyThisRoomAndDiscardsItsReply() {
+        User owner = User.builder().id(8L).build();
+        when(data.configureAgents(ROOM, owner, List.of("mira"))).thenReturn(true);
+        coordinator.setRunning(ROOM, true);
+        coordinator.setRunning(ROOM + 1, true);
+        when(ollama.generate(anyString(), anyList())).thenAnswer(invocation -> {
+            coordinator.configureAgents(ROOM, owner, List.of("mira"));
+            when(data.personas(ROOM)).thenReturn(List.of(AiPersona.ALL.get(2)));
+            return "Risposta con i vecchi partecipanti";
+        }).thenReturn("Risposta nuova");
+        coordinator.singleTurn(ROOM);
+        worker.runNext();
+
+        verify(data, never()).saveReply(eq(ROOM), anyLong(), anyString());
+        assertFalse(coordinator.status(ROOM).running());
+        assertFalse(coordinator.status(ROOM).generating());
+        assertEquals(0, coordinator.status(ROOM).remainingTurns());
+        assertTrue(coordinator.status(ROOM + 1).running());
+        coordinator.singleTurn(ROOM);
+        worker.runNext();
+        verify(data).context(ROOM, AiPersona.ALL.get(2));
+        verify(data).saveReply(ROOM, AGENT, "Risposta nuova");
+    }
+
+    @Test
+    void failedOrUnchangedSelectionDoesNotInterruptAnActiveConversation() {
+        User owner = User.builder().id(8L).build();
+        coordinator.setRunning(ROOM, true);
+        doThrow(new IllegalArgumentException("Agente sconosciuto"))
+                .when(data).configureAgents(ROOM, owner, List.of("unknown"));
+        assertThrows(IllegalArgumentException.class,
+                () -> coordinator.configureAgents(ROOM, owner, List.of("unknown")));
+        coordinator.configureAgents(ROOM, owner, List.of("aria", "bruno", "mira"));
+        assertTrue(coordinator.status(ROOM).running());
+        assertEquals(6, coordinator.status(ROOM).remainingTurns());
+    }
+
+    @Test
+    void oldestDueRoomGetsItsTurnEvenWhenGenerationTakesLongerThanTheInterval() {
+        for (long room = ROOM; room < ROOM + 3; room++) coordinator.setRunning(room, true);
+        for (int turn = 0; turn < 6; turn++) {
+            coordinator.tick();
+            now.addAndGet(30_000);
+            worker.runNext();
+        }
+        for (long room = ROOM; room < ROOM + 3; room++) {
+            verify(data, times(2)).saveReply(room, AGENT, "Risposta AI");
+        }
+    }
+
+    @Test
+    void removingAgentsBeforeQueuedWorkBeginsSkipsTheModelCall() {
+        User owner = User.builder().id(8L).build();
+        when(data.configureAgents(ROOM, owner, List.of())).thenReturn(true);
+        coordinator.singleTurn(ROOM);
+        coordinator.configureAgents(ROOM, owner, List.of());
+        worker.runNext();
+        verify(ollama, never()).generate(anyString(), anyList());
+        verify(data, never()).saveReply(anyLong(), anyLong(), anyString());
+        assertFalse(coordinator.status(ROOM).generating());
     }
 
     private static class QueuedExecutor implements Executor {

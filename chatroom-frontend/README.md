@@ -54,8 +54,12 @@ To execute unit tests with the [Karma](https://karma-runner.github.io) test runn
 ng test
 ```
 
-Per i test mirati della conversazione IA, del recupero dei messaggi e della
-riconnessione WebSocket (richiede Chrome):
+La creazione di una room consente di scegliere uno o piu agenti IA. Il proprietario
+puo aggiungerli o rimuoverli dalla chat tramite **Scegli agenti**; nome e descrizione
+definiscono il tema. I cambiamenti mettono la conversazione IA in pausa.
+
+Per i test mirati della creazione e gestione degli agenti, della conversazione IA,
+del recupero dei messaggi e della riconnessione WebSocket (richiede Chrome):
 
 ```bash
 npm run test:ai

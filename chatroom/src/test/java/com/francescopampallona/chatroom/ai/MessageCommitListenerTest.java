@@ -93,13 +93,13 @@ class MessageCommitListenerTest {
     }
 
     @Test
-    void humanMessagesInOrdinaryRoomsAreBroadcastWithoutTriggeringAi() {
+    void humanMessagesInUserCreatedRoomsAlsoNotifyTheCoordinator() {
         MessageResponse message = message(87L, false);
         transaction.executeWithoutResult(status ->
                 context.publishEvent(new MessageCommittedEvent(message, false, false)));
 
         verify(messaging).convertAndSend("/topic/rooms/87", message);
-        verifyNoInteractions(coordinator);
+        verify(coordinator).onHumanMessage(87L);
     }
 
     @Test

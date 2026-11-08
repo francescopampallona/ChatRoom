@@ -94,3 +94,9 @@ button:disabled {
   color: red;
   text-align: center;
 }
+.create-room-container, .create-room-card, input, textarea, select { box-sizing: border-box; }
+
+
+.agent-selection { margin: 8px 0 22px; }
+.agent-help { color: #64748b; font-size: 13px; line-height: 1.5; }
+.retry-agents { margin-top: 8px; background: #64748b; font-size: 13px; }

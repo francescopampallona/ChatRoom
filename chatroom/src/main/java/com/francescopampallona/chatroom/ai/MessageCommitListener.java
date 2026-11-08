@@ -22,7 +22,8 @@ public class MessageCommitListener {
             // The message is already committed. A broker failure must not retry the database write.
             log.warn("Message {} was committed but could not be broadcast", event.message().getId(), exception);
         }
-        if (event.aiRoom() && !event.senderAgent()) {
+        // Only active rooms are scheduled by the coordinator; ordinary themed rooms can also host agents.
+        if (!event.senderAgent()) {
             coordinator.onHumanMessage(event.message().getRoomId());
         }
     }

@@ -3,7 +3,8 @@ import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/co
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, Observable, Subscription, catchError, exhaustMap, finalize, tap, timeout, timer } from 'rxjs';
-import { AiRoomStatus } from '../../dto/AiRoomStatus';
+import { AiAgentCatalog, AiRoomStatus } from '../../dto/AiRoomStatus';
+import { AgentPickerComponent } from '../../components/agent-picker/agent-picker';
 import { MessageResponse } from '../../dto/MessageResponse';
 import { RoomDto } from '../../dto/RoomDto';
 import { AiRoomService } from '../../services/ai-room';
@@ -13,7 +14,7 @@ import { RoomService } from '../../services/room';
 
 @Component({
   selector: 'app-room-chat',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AgentPickerComponent],
   templateUrl: './room-chat.html',
   styleUrl: './room-chat.scss',
 })
@@ -31,6 +32,12 @@ export class RoomChatComponent implements OnInit, OnDestroy {
   aiBusy = false;
   aiStatusError = '';
   aiActionError = '';
+  agentCatalog?: AiAgentCatalog;
+  agentCatalogLoading = false;
+  agentCatalogError = '';
+  selectedAgentKeys: string[] = [];
+  agentSelectionDirty = false;
+  agentEditorOpen = false;
 
   @ViewChild('messagesContainer')
   private messagesContainer?: ElementRef<HTMLDivElement>;
@@ -60,7 +67,7 @@ export class RoomChatComponent implements OnInit, OnDestroy {
       next: room => {
         this.room = room;
         this.openConversation();
-        if (room.aiRoom) this.pollAiStatus();
+        this.pollAiStatus();
       },
       error: () => {
         this.loadingMessages = false;
@@ -72,6 +79,7 @@ export class RoomChatComponent implements OnInit, OnDestroy {
   get aiStatusLabel(): string {
     if (this.aiStatusError) return 'Stato non disponibile';
     if (!this.aiStatus) return 'Preparazione degli agenti…';
+    if (!this.aiStatus.agents.length) return 'Nessun agente invitato';
     if (!this.aiStatus.enabled || !this.aiStatus.ready) return 'Agenti non disponibili';
     if (this.aiStatus.generating) return 'Un agente sta scrivendo…';
     if (this.aiStatus.error) return 'Risposta interrotta';
@@ -82,22 +90,68 @@ export class RoomChatComponent implements OnInit, OnDestroy {
   get aiStatusHint(): string {
     if (this.aiStatusError) return 'Riproviamo automaticamente tra pochi secondi. Puoi continuare a chattare.';
     if (!this.aiStatus) return 'Stiamo verificando se gli agenti sono pronti a conversare.';
+    if (!this.aiStatus.agents.length) return 'Scegli chi invitare: gli agenti seguiranno il tema della room e leggeranno solo questa conversazione.';
     if (!this.aiStatus.enabled || !this.aiStatus.ready) {
       return 'Gli agenti non sono ancora pronti. Puoi continuare a scrivere mentre attendi.';
     }
     if (this.aiStatus.generating && !this.aiStatus.running) {
       return 'È in corso una risposta. La conversazione automatica resta in pausa.';
     }
-    if (!this.aiStatus.running) return 'Avvia il dialogo tra gli agenti oppure chiedi una sola risposta.';
+    if (!this.aiStatus.running) return this.aiStatus.agents.length === 1
+      ? 'Avvia la conversazione con l’agente oppure chiedi una sola risposta.'
+      : 'Avvia il dialogo tra gli agenti oppure chiedi una sola risposta.';
     if (this.aiStatus.remainingTurns === 0) {
-      return 'Gli agenti attendono un tuo messaggio per riprendere a parlare tra loro.';
+      return 'Gli agenti attendono un tuo messaggio per riprendere la conversazione.';
     }
-    return 'Gli agenti si rispondono a turno. Intervieni quando vuoi; dopo alcuni scambi attendono un tuo messaggio.';
+    return this.aiStatus.agents.length === 1
+      ? 'L’agente interviene sul tema della room. Scrivigli quando vuoi; dopo alcuni interventi attende un tuo messaggio.'
+      : 'Gli agenti si rispondono a turno. Intervieni quando vuoi; dopo alcuni scambi attendono un tuo messaggio.';
   }
 
   get canAskAgent(): boolean {
-    return !!this.aiStatus?.enabled && this.aiStatus.ready && !this.aiStatus.generating
+    return !!this.aiStatus?.agents.length && !!this.aiStatus.enabled && this.aiStatus.ready && !this.aiStatus.generating
       && !this.aiBusy && !this.aiStatusError;
+  }
+
+  get showAiPanel(): boolean {
+    return !!this.room?.aiRoom || !!this.aiStatus?.canManageAgents || !!this.aiStatus?.agents.length;
+  }
+
+  get aiPanelTitle(): string {
+    if (this.room?.aiRoom) return 'Tre voci, una conversazione';
+    if (!this.aiStatus?.agents.length) return 'Invita agenti nella tua chat';
+    return this.aiStatus.agents.length === 1 ? 'Un agente, il tuo tema' : 'Il tuo tema, più punti di vista';
+  }
+
+  selectAgents(keys: string[]): void {
+    if (this.aiBusy || !this.aiStatus?.canManageAgents || !this.agentCatalog?.enabled) return;
+    this.selectedAgentKeys = keys;
+    const current = this.aiStatus.agents.map(agent => agent.key);
+    this.agentSelectionDirty = keys.length !== current.length || keys.some(key => !current.includes(key));
+  }
+
+  saveAgents(): void {
+    if (this.aiBusy || !this.aiStatus?.canManageAgents || !this.agentCatalog?.enabled || !this.agentSelectionDirty) return;
+    this.runAiAction(this.aiRoomService.setAgents(this.roomId, [...this.selectedAgentKeys]), true);
+  }
+
+  cancelAgentSelection(): void {
+    if (this.aiBusy) return;
+    this.selectedAgentKeys = this.aiStatus?.agents.map(agent => agent.key) ?? [];
+    this.agentSelectionDirty = false;
+    this.agentEditorOpen = false;
+  }
+
+  loadAgentCatalog(): void {
+    if (this.agentCatalogLoading) return;
+    this.agentCatalogLoading = true;
+    this.agentCatalogError = '';
+    this.subscriptions.add(this.aiRoomService.getAgents().pipe(
+      timeout(12000), finalize(() => { this.agentCatalogLoading = false; })
+    ).subscribe({
+      next: catalog => { this.agentCatalog = catalog; },
+      error: () => { this.agentCatalogError = 'Non riusciamo a caricare gli agenti disponibili. Riprova tra poco.'; }
+    }));
   }
 
   setAiRunning(running: boolean): void {
@@ -182,8 +236,7 @@ export class RoomChatComponent implements OnInit, OnDestroy {
           timeout(12000),
           tap(status => {
             if (version !== this.aiUpdateVersion) return;
-            this.aiStatus = status;
-            this.aiStatusError = '';
+            this.applyAiStatus(status);
           }),
           catchError(() => {
             if (version === this.aiUpdateVersion) {
@@ -196,7 +249,16 @@ export class RoomChatComponent implements OnInit, OnDestroy {
     ).subscribe());
   }
 
-  private runAiAction(request: Observable<AiRoomStatus>): void {
+  private applyAiStatus(status: AiRoomStatus): void {
+    this.aiStatus = status;
+    this.aiStatusError = '';
+    if (!this.agentSelectionDirty) this.selectedAgentKeys = status.agents.map(agent => agent.key);
+    if (status.canManageAgents && !this.agentCatalog && !this.agentCatalogLoading && !this.agentCatalogError) {
+      this.loadAgentCatalog();
+    }
+  }
+
+  private runAiAction(request: Observable<AiRoomStatus>, selectionChange = false): void {
     this.aiBusy = true;
     this.aiActionError = '';
     // A poll started before a command must not overwrite the command's result.
@@ -206,12 +268,15 @@ export class RoomChatComponent implements OnInit, OnDestroy {
       finalize(() => { this.aiBusy = false; })
     ).subscribe({
       next: status => {
-        this.aiStatus = status;
-        this.aiStatusError = '';
+        if (selectionChange) {
+          this.agentSelectionDirty = false;
+          this.agentEditorOpen = false;
+        }
+        this.applyAiStatus(status);
       },
       error: error => {
         this.aiActionError = error.status === 403
-          ? 'Solo i membri della room possono gestire gli agenti.'
+          ? selectionChange ? 'Solo il proprietario della room può scegliere gli agenti.' : 'Solo i membri della room possono gestire la conversazione IA.'
           : error.status === 409
             ? 'Un agente sta già preparando una risposta. Attendi qualche istante.'
             : 'Non è stato possibile aggiornare gli agenti. Attendi qualche istante e riprova.';

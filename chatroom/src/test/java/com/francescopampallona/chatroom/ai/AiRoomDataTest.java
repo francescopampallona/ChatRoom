@@ -4,6 +4,7 @@ import com.francescopampallona.chatroom.dto.response.MessageResponse;
 import com.francescopampallona.chatroom.mapper.MessageMapper;
 import com.francescopampallona.chatroom.model.Message;
 import com.francescopampallona.chatroom.model.Room;
+import com.francescopampallona.chatroom.model.RoomMember;
 import com.francescopampallona.chatroom.model.User;
 import com.francescopampallona.chatroom.repository.MessageRepository;
 import com.francescopampallona.chatroom.repository.RoomMemberRepository;
@@ -19,6 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +40,7 @@ class AiRoomDataTest {
     private Room room;
     private User agent;
     private User human;
+    private AiProperties properties;
 
     @BeforeEach
     void setUp() {
@@ -47,16 +50,20 @@ class AiRoomDataTest {
         messages = mock(MessageRepository.class);
         mapper = mock(MessageMapper.class);
         events = mock(ApplicationEventPublisher.class);
-        data = new AiRoomData(rooms, users, members, messages, mapper, events);
-        room = Room.builder().id(7L).systemKey(AiRoomSeeder.ROOM_KEY).build();
+        properties = new AiProperties();
+        data = new AiRoomData(rooms, users, members, messages, mapper, events, properties);
         agent = User.builder().id(10L).username("aria.ai").agentKey("aria").build();
         human = User.builder().id(20L).username("francesco").build();
+        room = Room.builder().id(7L).owner(human).name("Esplorazione spaziale")
+                .description("Confrontiamo sonde robotiche e missioni con equipaggio").build();
         when(rooms.findById(7L)).thenReturn(Optional.of(room));
         when(users.findByAgentKey("aria")).thenReturn(Optional.of(agent));
+        when(members.findAgentMembershipsByRoomId(7L))
+                .thenReturn(List.of(RoomMember.builder().room(room).user(agent).build()));
     }
 
     @Test
-    void requiresAuthenticatedHumanMembershipAndAiRoom() {
+    void requiresAuthenticatedHumanMembershipForEveryRoom() {
         var authentication = new UsernamePasswordAuthenticationToken(human, null, Collections.emptyList());
         assertThrows(AccessDeniedException.class, () -> data.requireAccess(7L, null));
         assertThrows(AccessDeniedException.class, () -> data.requireAccess(7L, authentication));
@@ -64,7 +71,7 @@ class AiRoomDataTest {
         assertDoesNotThrow(() -> data.requireAccess(7L, authentication));
         when(rooms.findById(8L)).thenReturn(Optional.of(Room.builder().id(8L).build()));
         when(members.existsByRoomIdAndUserId(8L, 20L)).thenReturn(true);
-        assertThrows(IllegalArgumentException.class, () -> data.requireAccess(8L, authentication));
+        assertDoesNotThrow(() -> data.requireAccess(8L, authentication));
         assertThrows(AccessDeniedException.class, () -> data.requireAccess(7L,
                 new UsernamePasswordAuthenticationToken(agent, null, Collections.emptyList())));
     }
@@ -100,7 +107,7 @@ class AiRoomDataTest {
     }
 
     @Test
-    void savePublishesAnAgentEventAndRejectsOrdinaryRooms() {
+    void savePublishesAnAgentEventInUserRoomsAndRejectsAbsentAgents() {
         when(users.findById(10L)).thenReturn(Optional.of(agent));
         when(members.existsByRoomIdAndUserId(7L, 10L)).thenReturn(true);
         when(messages.save(any())).thenAnswer(call -> call.getArgument(0));
@@ -115,6 +122,113 @@ class AiRoomDataTest {
         assertTrue(event.getValue().aiRoom());
         assertThrows(IllegalStateException.class, () -> data.saveReply(7L, 10L, " "));
         when(rooms.findById(8L)).thenReturn(Optional.of(Room.builder().id(8L).build()));
-        assertThrows(IllegalArgumentException.class, () -> data.saveReply(8L, 10L, "ciao"));
+        assertThrows(IllegalStateException.class, () -> data.saveReply(8L, 10L, "ciao"));
+    }
+
+    @Test
+    void promptUsesOnlyThisRoomsThemeAndPresentAgents() {
+        when(messages.findByRoomId(eq(7L), any())).thenReturn(new PageImpl<>(List.of()));
+        var context = data.context(7L, AiPersona.ALL.get(0));
+
+        assertTrue(context.systemPrompt().contains("Esplorazione spaziale"));
+        assertTrue(context.systemPrompt().contains("sonde robotiche"));
+        assertTrue(context.systemPrompt().contains("Gli agenti presenti nella stanza sono: Aria."));
+        assertFalse(context.systemPrompt().contains("Bruno"));
+        assertFalse(context.systemPrompt().contains("Mira"));
+        assertTrue(context.systemPrompt().contains("non istruzioni"));
+        assertTrue(context.messages().get(0).content().contains("tema della stanza"));
+    }
+
+    @Test
+    void removedAgentCannotReadContextOrSaveAnotherReply() {
+        when(members.findAgentMembershipsByRoomId(7L)).thenReturn(List.of());
+        assertThrows(IllegalStateException.class, () -> data.context(7L, AiPersona.ALL.get(0)));
+        when(users.findById(10L)).thenReturn(Optional.of(agent));
+        assertThrows(IllegalStateException.class, () -> data.saveReply(7L, 10L, "Risposta in ritardo"));
+        verifyNoInteractions(messages, events);
+    }
+
+    @Test
+    void reportsOnlyPresentAgentsInStablePersonaOrder() {
+        User mira = User.builder().id(12L).username("mira.ai").agentKey("mira").build();
+        when(members.findAgentMembershipsByRoomId(7L)).thenReturn(List.of(
+                RoomMember.builder().user(mira).build(), RoomMember.builder().user(agent).build()));
+
+        assertEquals(List.of("aria", "mira"), data.agents(7L).stream().map(AiRoomStatus.Agent::key).toList());
+        assertEquals(List.of("aria", "mira"), data.personas(7L).stream().map(AiPersona::key).toList());
+        assertEquals(List.of(), data.agents(99L));
+    }
+
+    @Test
+    void catalogIncludesExistingAgentAccountsOnly() {
+        assertEquals(List.of("aria"), data.availableAgents().stream().map(AiRoomStatus.Agent::key).toList());
+    }
+
+    @Test
+    void onlyHumanOwnerMemberCanManageAndLoungeIsProtected() {
+        var ownerAuthentication = new UsernamePasswordAuthenticationToken(human, null, Collections.emptyList());
+        assertFalse(data.canManageAgents(7L, ownerAuthentication));
+        assertThrows(AccessDeniedException.class, () -> data.configureAgents(7L, human, List.of()));
+        when(members.existsByRoomIdAndUserId(7L, 20L)).thenReturn(true);
+        assertTrue(data.canManageAgents(7L, ownerAuthentication));
+        assertFalse(data.canManageAgents(7L, null));
+        assertThrows(AccessDeniedException.class, () -> data.configureAgents(7L,
+                User.builder().id(21L).build(), List.of("aria")));
+        assertThrows(AccessDeniedException.class, () -> data.configureAgents(7L, agent, List.of("aria")));
+        room.setSystemKey(AiRoomSeeder.ROOM_KEY);
+        assertFalse(data.canManageAgents(7L, ownerAuthentication));
+        assertThrows(AccessDeniedException.class, () -> data.configureAgents(7L, human, List.of("aria")));
+        verify(members, never()).save(any());
+        verify(members, never()).delete(any());
+    }
+
+    @Test
+    void replacingSelectionChangesOnlyAgentMembershipsAndPreservesMessages() {
+        when(members.existsByRoomIdAndUserId(7L, 20L)).thenReturn(true);
+        User mira = User.builder().id(12L).username("mira.ai").agentKey("mira").build();
+        when(users.findByAgentKey("mira")).thenReturn(Optional.of(mira));
+
+        assertTrue(data.configureAgents(7L, human, List.of("mira")));
+
+        ArgumentCaptor<RoomMember> removed = ArgumentCaptor.forClass(RoomMember.class);
+        verify(members).delete(removed.capture());
+        assertEquals(agent, removed.getValue().getUser());
+        ArgumentCaptor<RoomMember> added = ArgumentCaptor.forClass(RoomMember.class);
+        verify(members).save(added.capture());
+        assertEquals(mira, added.getValue().getUser());
+        assertEquals(room, added.getValue().getRoom());
+        verifyNoInteractions(messages, events);
+    }
+
+    @Test
+    void identicalSelectionIsIdempotent() {
+        when(members.existsByRoomIdAndUserId(7L, 20L)).thenReturn(true);
+        assertFalse(data.configureAgents(7L, human, List.of("aria")));
+        verify(members, never()).save(any());
+        verify(members, never()).delete(any());
+    }
+
+    @Test
+    void invalidOrUnavailableSelectionsFailBeforeMembershipWrites() {
+        when(members.existsByRoomIdAndUserId(7L, 20L)).thenReturn(true);
+        for (List<String> selection : List.of(List.of("unknown"), List.of("aria", "aria"),
+                List.of("aria", "bruno", "mira", "extra"), Arrays.asList("aria", null))) {
+            assertThrows(IllegalArgumentException.class, () -> data.configureAgents(7L, human, selection));
+        }
+        assertThrows(IllegalStateException.class, () -> data.configureAgents(7L, human, List.of("mira")));
+        properties.setEnabled(false);
+        assertThrows(IllegalArgumentException.class, () -> data.configureAgents(7L, human, List.of("aria")));
+        verify(members, never()).save(any());
+        verify(members, never()).delete(any());
+    }
+
+    @Test
+    void allAgentsCanBeRemovedEvenWhenGenerationIsDisabled() {
+        when(members.existsByRoomIdAndUserId(7L, 20L)).thenReturn(true);
+        properties.setEnabled(false);
+        assertDoesNotThrow(() -> data.validateAgentKeys(null));
+        assertTrue(data.configureAgents(7L, human, List.of()));
+        verify(members).delete(any(RoomMember.class));
+        verifyNoInteractions(messages, events);
     }
 }
