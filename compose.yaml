@@ -8,6 +8,8 @@ services:
       MYSQL_USER: ${MYSQL_USER:-chatroom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-chatroom-local-password}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-chatroom-local-root-password}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -30,12 +32,35 @@ services:
       MYSQL_USER: ${MYSQL_USER:-chatroom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-chatroom-local-password}
       JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me-at-least-32-bytes}
+      CHATROOM_AI_ENABLED: ${AI_ENABLED:-true}
+      CHATROOM_AI_BASEURL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      CHATROOM_AI_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      CHATROOM_AI_INTERVALSECONDS: ${AI_INTERVAL_SECONDS:-15}
+      CHATROOM_AI_MAXAUTONOMOUSTURNS: ${AI_MAX_AUTONOMOUS_TURNS:-6}
+      CHATROOM_AI_REQUESTTIMEOUTSECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-120}
     expose:
       - "8080"
     depends_on:
       db:
         condition: service_healthy
     stop_grace_period: 40s
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_CONTEXT_LENGTH: "4096"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
 
   frontend:
@@ -50,3 +75,4 @@ services:
 
 volumes:
   mysql_data:
+  ollama_models:

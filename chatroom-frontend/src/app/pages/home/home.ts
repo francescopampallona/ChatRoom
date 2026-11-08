@@ -50,7 +50,7 @@ export class HomeComponent {
 
   this.roomService.getMyRooms().subscribe({
     next: rooms => {
-      this.myRooms = rooms;
+      this.myRooms = this.aiRoomsFirst(rooms);
       this.loadPublicRooms();
     },
     error: () => {
@@ -63,7 +63,7 @@ export class HomeComponent {
 loadPublicRooms(): void {
   this.roomService.getPublicRooms().subscribe({
     next: rooms => {
-      this.publicRooms = rooms;
+      this.publicRooms = this.aiRoomsFirst(rooms);
       this.loading = false;
     },
     error: () => {
@@ -73,13 +73,19 @@ loadPublicRooms(): void {
   });
 }
 
-joinRoom(roomId: number): void {
+joinRoom(roomId: number, openAfterJoin = false): void {
+  if (this.loading) return;
   this.loading = true;
   this.errorMessage = '';
 
   this.roomService.joinPublicRoom(roomId).subscribe({
     next: () => {
-      this.loadRooms();
+      if (openAfterJoin) {
+        this.loading = false;
+        this.openChat(roomId);
+      } else {
+        this.loadRooms();
+      }
     },
     error: (error) => {
       this.loading = false;
@@ -94,7 +100,7 @@ isMyRoom(roomId: number): boolean {
 }
 
 isOwner(room: RoomDto): boolean {
-  return room.ownerId === this.currentUser.id;
+  return room.ownerId === this.currentUser?.id;
 }
 
 leaveRoom(roomId: number): void {
@@ -126,6 +132,10 @@ openChat(roomId: number): void {
     roomId,
     'chat'
   ]);
+}
+
+private aiRoomsFirst(rooms: RoomDto[]): RoomDto[] {
+  return [...rooms].sort((left, right) => Number(!!right.aiRoom) - Number(!!left.aiRoom));
 }
 
 }

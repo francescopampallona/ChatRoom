@@ -4,10 +4,11 @@
 
     <header class="chat-header">
          <div>
-        <h1>{{ room?.name }}</h1>
+        <h1>{{ room?.name || 'Chat room' }}</h1>
 
-        <p>
-            {{ room?.type === 'PRIVATE'
+        <p *ngIf="room">
+            <span class="ai-badge" *ngIf="room.aiRoom">IA Lounge</span>
+            {{ room.type === 'PRIVATE'
                 ? 'Room privata'
                 : 'Room pubblica' }}
         </p>
@@ -31,30 +32,73 @@
       </div>
     </header>
 
+    <section class="ai-panel" *ngIf="room?.aiRoom" aria-label="Agenti della room">
+      <div class="ai-panel-heading">
+        <div>
+          <h2>Tre voci, una conversazione</h2>
+          <p>Gli agenti IA dialogano tra loro e con te. Puoi entrare nella conversazione in qualsiasi momento.</p>
+        </div>
+        <span class="ai-status" role="status"
+          [class.active]="aiStatus?.running && aiStatus?.ready && !aiStatusError">
+          {{ aiStatusLabel }}
+        </span>
+      </div>
+
+      <ul class="ai-participants" *ngIf="aiStatus?.agents?.length">
+        <li *ngFor="let agent of aiStatus?.agents">
+          <div><strong>{{ agent.displayName }} <span class="ai-badge">IA</span></strong><p>{{ agent.description }}</p></div>
+        </li>
+      </ul>
+
+      <p class="ai-hint">{{ aiStatusHint }}</p>
+      <div class="ai-actions">
+        <button type="button" class="ai-primary"
+          *ngIf="!aiStatus?.running || aiStatus?.remainingTurns === 0"
+          [disabled]="!canAskAgent" (click)="setAiRunning(true)">
+          {{ aiStatus?.running ? 'Nuovo giro' : 'Avvia conversazione' }}
+        </button>
+        <button type="button" *ngIf="aiStatus?.running"
+          [disabled]="aiBusy" (click)="setAiRunning(false)">Metti in pausa</button>
+        <button type="button" [disabled]="!canAskAgent" (click)="requestAiTurn()">Una risposta IA</button>
+        <span class="ai-updating" *ngIf="aiBusy" role="status">Aggiornamento…</span>
+      </div>
+      <p class="ai-shared-note">I comandi valgono per tutta la room. In pausa puoi chiedere una risposta alla volta.</p>
+      <p class="ai-error" *ngIf="aiStatusError" role="alert">{{ aiStatusError }}</p>
+      <p class="ai-error" *ngIf="aiActionError" role="alert">{{ aiActionError }}</p>
+      <p class="ai-error" *ngIf="aiStatus && aiStatus.error && aiStatus.enabled && aiStatus.ready && !aiStatusError" role="status">
+        Un agente non è riuscito a rispondere. Attendi qualche istante e riprova con “Una risposta IA”.
+      </p>
+    </section>
+
     <p
       class="error-message"
       *ngIf="errorMessage"
+      role="alert"
     >
       {{ errorMessage }}
     </p>
 
-    <section class="messages" #messagesContainer>
+    <section class="messages" #messagesContainer aria-label="Messaggi della room">
+
+      <p class="empty-state" *ngIf="loadingMessages && messages.length === 0">Caricamento messaggi…</p>
 
       <div
         class="empty-state"
-        *ngIf="messages.length === 0"
+        *ngIf="!loadingMessages && messages.length === 0"
       >
-        Non ci sono ancora messaggi.
+        {{ room?.aiRoom ? 'Scrivi il primo messaggio o avvia una conversazione tra gli agenti.' : 'Non ci sono ancora messaggi.' }}
       </div>
 
       <article
         class="message"
-        *ngFor="let message of messages"
+        [class.agent-message]="message.senderIsAgent"
+        *ngFor="let message of messages; trackBy: trackMessage"
       >
         <div class="message-header">
 
           <strong>
-            {{ message.senderUsername }}
+            {{ senderName(message) }}
+            <span class="ai-badge" *ngIf="message.senderIsAgent" aria-label="Agente di intelligenza artificiale">IA</span>
           </strong>
 
           <time>
@@ -81,6 +125,7 @@
         name="newMessage"
         [(ngModel)]="newMessage"
         placeholder="Scrivi un messaggio..."
+        aria-label="Il tuo messaggio"
         autocomplete="off"
         [disabled]="!connected || sending"
       >

@@ -3,6 +3,7 @@ export interface MessageResponse {
   roomId: number;
   senderId: number;
   senderUsername: string;
+  senderIsAgent: boolean;
   content: string;
   sentAt: string;
 }

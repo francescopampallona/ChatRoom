@@ -26,6 +26,14 @@ public class Room {
 
     private String description;
 
+    @Column(name = "system_key", unique = true, length = 40)
+    private String systemKey;
+
+    @Transient
+    public boolean isAiRoom() {
+        return "ai-lounge".equals(systemKey);
+    }
+
     @Enumerated(EnumType.STRING)
     private RoomType type;
 

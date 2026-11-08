@@ -264,3 +264,16 @@
   transform: none;
   box-shadow: none;
 }
+
+.room-card.ai-room-card { border-color: #a5b4fc; background: #eef2ff; }
+.room-card .ai-room-badge { background: #4f46e5; color: white; font-size: 11px; letter-spacing: .06em; }
+.room-card .ai-room-note { color: #4338ca; font-size: 13px; line-height: 1.5; }
+.room-card .open-chat-button { width: 100%; margin-top: 12px; }
+.join-room-button:disabled, .leave-room-button:disabled { opacity: .55; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .home-container { padding: 16px; }
+  .home-card { padding: 20px; min-width: 0; }
+  .room-list { grid-template-columns: 1fr; }
+  .home-card h1 { font-size: 26px; }
+}

@@ -64,6 +64,10 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BadCredentialsException("Credenziali non valide"));
 
+        if (user.isAgent()) {
+            throw new BadCredentialsException("Credenziali non valide");
+        }
+
         boolean passwordMatches = passwordEncoder.matches(
                 password,
                 user.getPasswordHash()

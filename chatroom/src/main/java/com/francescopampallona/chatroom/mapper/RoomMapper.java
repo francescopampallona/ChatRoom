@@ -19,5 +19,6 @@ public interface RoomMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "owner", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "systemKey", ignore = true)
     Room toEntity(CreateRoomRequest request);
 }

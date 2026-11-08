@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:ai": "ng test --watch=false --browsers=ChromeHeadless --ts-config=tsconfig.ai-spec.json --include=src/app/pages/room-chat/room-chat.spec.ts --include=src/app/services/chat.spec.ts"
   },
   "prettier": {
     "printWidth": 100,

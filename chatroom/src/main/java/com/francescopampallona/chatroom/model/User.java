@@ -30,6 +30,15 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    // Null for existing human accounts; stable keys identify seeded AI accounts.
+    @Column(name = "agent_key", unique = true, length = 40)
+    private String agentKey;
+
+    @Transient
+    public boolean isAgent() {
+        return agentKey != null;
+    }
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 }

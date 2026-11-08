@@ -59,6 +59,8 @@ export class ChatService {
       heartbeatOutgoing: 10000,
 
       onConnect: () => {
+        // Subscriptions belong to a STOMP connection and must be recreated on reconnect.
+        this.roomSubscriptions.clear();
         this.connectedSubject.next(true);
       },
 
@@ -67,6 +69,7 @@ export class ChatService {
       },
 
       onWebSocketClose: () => {
+        this.roomSubscriptions.clear();
         this.connectedSubject.next(false);
       },
 

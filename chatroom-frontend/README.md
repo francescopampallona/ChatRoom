@@ -54,6 +54,17 @@ To execute unit tests with the [Karma](https://karma-runner.github.io) test runn
 ng test
 ```
 
+Per i test mirati della conversazione IA, del recupero dei messaggi e della
+riconnessione WebSocket (richiede Chrome):
+
+```bash
+npm run test:ai
+```
+
+Questa suite usa `tsconfig.ai-spec.json` per escludere gli altri test generati
+inizialmente dal progetto, alcuni dei quali importano nomi di componenti o servizi
+che non esistono più.
+
 ## Running end-to-end tests
 
 For end-to-end (e2e) testing, run:

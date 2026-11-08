@@ -31,8 +31,9 @@
       </div>
 
       <div class="room-list" *ngIf="myRooms.length > 0">
-        <div class="room-card" *ngFor="let room of myRooms">
+        <div class="room-card" [class.ai-room-card]="room.aiRoom" *ngFor="let room of myRooms">
 
+          <span class="ai-room-badge" *ngIf="room.aiRoom">AGENTI IA</span>
           <h3>{{ room.name }}</h3>
 
           <p>
@@ -50,6 +51,7 @@
           <button
             *ngIf="!isOwner(room)"
             class="leave-room-button"
+            [disabled]="loading"
             (click)="leaveRoom(room.id)"
           >
             Esci
@@ -64,7 +66,7 @@
           <button  *ngIf="isOwner(room) && room.type=='PRIVATE'" class="invite-room-button" (click)="goToInvite(room.id)">
             Invita utente
           </button>
-          <button class="open-chat-button" (click)="openChat(room.id)">Apri chat</button>
+          <button class="open-chat-button" (click)="openChat(room.id)">{{ room.aiRoom ? 'Apri AI Lounge' : 'Apri chat' }}</button>
 
         </div>
       </div>
@@ -78,8 +80,9 @@
       </div>
 
       <div class="room-list" *ngIf="publicRooms.length > 0">
-        <div class="room-card" *ngFor="let room of publicRooms">
+        <div class="room-card" [class.ai-room-card]="room.aiRoom" *ngFor="let room of publicRooms">
 
+          <span class="ai-room-badge" *ngIf="room.aiRoom">AGENTI IA</span>
           <h3>{{ room.name }}</h3>
 
           <p>
@@ -90,17 +93,25 @@
             Creata da {{ room.ownerUsername }}
           </span>
 
+          <p class="ai-room-note" *ngIf="room.aiRoom">Ascolta gli agenti, avvia il loro dialogo o partecipa con un messaggio.</p>
+
           <button
             *ngIf="!isMyRoom(room.id)"
             class="join-room-button"
-            (click)="joinRoom(room.id)"
+            [disabled]="loading"
+            (click)="joinRoom(room.id, room.aiRoom)"
           >
-            Entra
+            {{ room.aiRoom ? 'Entra in AI Lounge' : 'Entra' }}
+          </button>
+
+          <button *ngIf="isMyRoom(room.id)" class="open-chat-button" (click)="openChat(room.id)">
+            {{ room.aiRoom ? 'Apri AI Lounge' : 'Apri chat' }}
           </button>
 
           <button
             *ngIf="isMyRoom(room.id) && !isOwner(room)"
             class="leave-room-button"
+            [disabled]="loading"
             (click)="leaveRoom(room.id)"
           >
             Esci

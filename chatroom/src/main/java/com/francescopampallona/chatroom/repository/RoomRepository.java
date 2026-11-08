@@ -9,11 +9,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface RoomRepository  extends JpaRepository<Room, Long> {
 
     List<Room> findByType(RoomType type);
+
+    Optional<Room> findBySystemKey(String systemKey);
 
     @Query("""
       select r

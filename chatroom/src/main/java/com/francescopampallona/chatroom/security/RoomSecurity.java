@@ -13,7 +13,10 @@ public class RoomSecurity {
     private final RoomMemberRepository roomMemberRepository;
 
     public boolean isMember(Long roomId, Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
+        if (authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof User user) || user.isAgent()) {
+            return false;
+        }
 
         return roomMemberRepository.existsByRoomIdAndUserId(
                 roomId,

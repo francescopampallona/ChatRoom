@@ -1,6 +1,7 @@
 package com.francescopampallona.chatroom.service;
 
 import com.francescopampallona.chatroom.dto.request.MessageRequest;
+import com.francescopampallona.chatroom.ai.MessageCommittedEvent;
 import com.francescopampallona.chatroom.dto.response.MessageResponse;
 import com.francescopampallona.chatroom.dto.response.PageResponse;
 import com.francescopampallona.chatroom.mapper.MessageMapper;
@@ -14,7 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
     private final MessageMapper messageMapper;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ApplicationEventPublisher events;
 
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -87,10 +88,7 @@ public class MessageService {
 
         MessageResponse response = messageMapper.toDto(savedMessage);
 
-        messagingTemplate.convertAndSend(
-                "/topic/rooms/" + roomId,
-                response
-        );
+        events.publishEvent(new MessageCommittedEvent(response, room.isAiRoom(), currentUser.isAgent()));
 
         return response;
     }

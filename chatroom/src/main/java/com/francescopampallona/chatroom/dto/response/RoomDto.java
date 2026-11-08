@@ -18,6 +18,7 @@ public class RoomDto {
     private String name;
     private String description;
     private RoomType type;
+    private boolean aiRoom;
 
     private Long ownerId;
     private String ownerUsername;

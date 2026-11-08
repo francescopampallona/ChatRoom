@@ -17,6 +17,7 @@ public class MessageResponse {
     private Long senderId;
 
     private String senderUsername;
+    private boolean senderIsAgent;
 
     private String content;
 

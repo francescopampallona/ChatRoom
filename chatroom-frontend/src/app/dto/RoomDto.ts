@@ -3,6 +3,7 @@ export interface RoomDto {
   name: string;
   description: string;
   type: 'PUBLIC' | 'PRIVATE';
+  aiRoom: boolean;
   ownerId: number;
   ownerUsername: string;
   createdAt: string;

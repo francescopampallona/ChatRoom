@@ -56,7 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 User user = userRepository.findByUsername(username)
                         .orElse(null);
 
-                if (user != null) {
+                if (user != null && !user.isAgent()) {
 
                     UsernamePasswordAuthenticationToken authenticationToken =
                             new UsernamePasswordAuthenticationToken(

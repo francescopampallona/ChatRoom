@@ -61,6 +61,10 @@ public class JwtStompAuthenticationInterceptor implements ChannelInterceptor {
                         new BadCredentialsException("Utente non trovato")
                 );
 
+        if (user.isAgent()) {
+            throw new BadCredentialsException("Account non disponibile per il login");
+        }
+
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
                         user,
